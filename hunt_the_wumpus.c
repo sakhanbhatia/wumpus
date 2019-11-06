@@ -1,17 +1,27 @@
 /******************************************************************************
-
                             Online C Compiler.
                 Code, Compile, Run and Debug C program online.
 Write your code in this editor and press "Run" button to compile and execute it.
-
 *******************************************************************************/
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#define MAX_PROPERTIES 6
-int wumpus_matrix[10][10][MAX_PROPERTIES];
-int ai_matrix[10][10][MAX_PROPERTIES];
+#define WM_MAX_PROPERTIES 6
+#define AIM_MAX_PROPERTIES 10
+#define ENTRY 0
+#define BREEZY 1
+#define STENCH 2
+#define PIT 3
+#define WUMPUS 4
+#define GOLD 5
+#define PIT_WEIGHT 6
+#define WUMPUS_WEIGHT 7
+#define VISITED 8
+#define SAFE 9
+
+int wumpus_matrix[10][10][WM_MAX_PROPERTIES];
+int ai_matrix[10][10][AIM_MAX_PROPERTIES];
 int g_row, g_col;
 int starting_row = -1, starting_col = -1;
 int
@@ -57,22 +67,25 @@ main (void)
   display_all_boards (3);
   take_board_input ();
   display_all_boards (1);
-  
+
   begin();
+  printf("End");
+  display_all_boards (3);
   return 0;
 }
 
 void
 init_all_boards (int rows, int cols)
 {
-  int i, j, k;
+  int i, j, k, l;
   for (i = 0; i < rows; i++)
     {
       for (j = 0; j < cols; j++)
 	{
-	  for (k = 0; k < MAX_PROPERTIES; k++)
-	        wumpus_matrix[i][j][k] = 0;
-	  ai_matrix[i][j] = 0;
+	  for (k = 0; k < WM_MAX_PROPERTIES; k++)
+        wumpus_matrix[i][j][k] = 0;
+      for(l=0;l<AIM_MAX_PROPERTIES;l++)
+        ai_matrix[i][j][l] = 0;
 	}
     }
 }
@@ -80,7 +93,7 @@ init_all_boards (int rows, int cols)
 void
 display_all_boards (int choice)
 {
-  int i, j, k;
+  int i, j, k, l;
   if (choice == 1 || choice == 3)
     {
       printf ("\nWumpus Matrix :\n");
@@ -88,7 +101,7 @@ display_all_boards (int choice)
 	{
 	  for (j = 0; j < g_col; j++)
 	    {
-	      for (k = 0; k < MAX_PROPERTIES; k++)
+	      for (k = 0; k < WM_MAX_PROPERTIES; k++)
 		{
 		  //printf("%d",wumpus_matrix [i][j][k]);
 		  if (wumpus_matrix[i][j][k] == 1)
@@ -107,7 +120,11 @@ display_all_boards (int choice)
 	{
 	  for (j = 0; j < g_col; j++)
 	    {
-	      printf ("%d \t", ai_matrix[i][j]);
+	        for(l=0;l<AIM_MAX_PROPERTIES;l++)
+            {
+                printf ("%d", ai_matrix[i][j][l]);
+            }
+	      printf("\t");
 	    }
 	  printf ("\n");
 	}
@@ -223,28 +240,90 @@ void begin()
     {
         read(starting_row,starting_col);
     }
+    else
+    {
+        printf("Entry Point missing!\n");
+        return;
+    }
 }
 
 
-void read(int row, col)
+void read(int row, int col)
 {
     int k;
-    for(k=0;k<MAX_PROPERTIES;k++)
+    for(k=0;k<WM_MAX_PROPERTIES;k++)
     {
         ai_matrix[row][col][k] = wumpus_matrix[row][col][k];
     }
-    //action(row,col);
-    
+
+    if(ai_matrix[row][col][PIT] == 1 || ai_matrix[row][col][WUMPUS] ==1)
+    {
+        printf("You died because");
+        ai_matrix[row][col][PIT]?printf(" you fell into a pit at %d,%d.\n",row,col):printf(" you woke the Wumpus at %d,%d.",row,col);
+        ai_matrix[row][col][VISITED] = 1;
+        exit(0);
+    }
+
+    action(row,col); //Take appropriate actions on the new information.
+    decide_next_move(row,col);
+
 }
 
-void action(int row, col)
+void action(int row, int col)
 {
-    int k;
-    for(k=0;k<MAX_PROPERTIES;k++)
+    if(ai_matrix[row][col][VISITED] == 1)
+        return;
+    if (ai_matrix[row][col][BREEZY] == 1)
+        mark_adj(row,col,BREEZY);
+    if(ai_matrix[row][col][STENCH] == 1)
+        mark_adj(row,col,STENCH);
+    //if(ai_matrix[row][col][GOLD] == 1)
+        //FILL action;
+    if ((ai_matrix[row][col][BREEZY] == 0) && (ai_matrix[row][col][STENCH] == 0))
+        mark_adj(row,col,SAFE);
+
+    ai_matrix[row][col][VISITED] = 1;
+}
+
+void mark_adj(int row,int col,int property)
+{
+    //We have to mark the adjacent slots
+    if((row-1)>=0)
     {
-        if (ai_matrix[row][col][k] == 1)
-        {
-            
-        }
+        mark_adj_slots(row-1,col,property);
     }
+    if((row+1)<g_row)
+    {
+        mark_adj_slots(row+1,col,property);
+    }
+    if((col-1)>=0)
+    {
+        mark_adj_slots(row,col-1,property);
+    }
+    if((col+1)<g_col)
+    {
+        mark_adj_slots(row,col+1,property);
+    }
+    return;
+}
+
+
+void mark_adj_slot(int r, int c, int p)
+{
+    if(p == BREEZY)
+        ai_matrix[r][c][PIT_WEIGHT] ++;
+    else if(p == STENCH)
+        ai_matrix[r][c][WUMPUS_WEIGHT]++;
+    else if(p == SAFE)
+    {
+        ai_matrix[r][c][SAFE] = 1;
+        ai_matrix[r][c][PIT_WEIGHT] == 0;
+        ai_matrix[r][c][WUMPUS_WEIGHT] == 0;
+    }
+
+}
+
+void decide_next_move(row,col)
+{
+
 }
